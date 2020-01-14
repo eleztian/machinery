@@ -7,9 +7,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/RichardKnop/machinery/v1/brokers/iface"
-	"github.com/RichardKnop/machinery/v1/common"
-	"github.com/RichardKnop/machinery/v1/tasks"
+	"github.com/eleztian/machinery/v1/brokers/iface"
+	"github.com/eleztian/machinery/v1/common"
+	"github.com/eleztian/machinery/v1/tasks"
 )
 
 // Broker represents an "eager" in-memory broker
@@ -60,11 +60,6 @@ func (eagerBroker *Broker) Publish(ctx context.Context, task *tasks.Signature) e
 
 	// blocking call to the task directly
 	return eagerBroker.worker.Process(signature)
-}
-
-// GetPendingTasks returns a slice of task.Signatures waiting in the queue
-func (eagerBroker *Broker) GetPendingTasks(queue string) ([]*tasks.Signature, error) {
-	return []*tasks.Signature{}, errors.New("Not implemented")
 }
 
 // AssignWorker assigns a worker to the eager broker

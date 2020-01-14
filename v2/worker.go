@@ -8,13 +8,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/opentracing/opentracing-go"
+
 	"github.com/eleztian/machinery/v1/backends/amqp"
 	"github.com/eleztian/machinery/v1/brokers/errs"
 	"github.com/eleztian/machinery/v1/log"
 	"github.com/eleztian/machinery/v1/retry"
 	"github.com/eleztian/machinery/v1/tasks"
 	"github.com/eleztian/machinery/v1/tracing"
-	"github.com/opentracing/opentracing-go"
 )
 
 // Worker represents a single worker process
@@ -27,13 +28,6 @@ type Worker struct {
 	preTaskHandler  func(*tasks.Signature)
 	postTaskHandler func(*tasks.Signature)
 }
-
-var (
-	// ErrWorkerQuitGracefully is return when worker quit gracefully
-	ErrWorkerQuitGracefully = errors.New("Worker quit gracefully")
-	// ErrWorkerQuitGracefully is return when worker quit abruptly
-	ErrWorkerQuitAbruptly = errors.New("Worker quit abruptly")
-)
 
 // Launch starts a new worker process. The worker subscribes
 // to the default queue and processes incoming registered tasks
@@ -51,20 +45,20 @@ func (worker *Worker) LaunchAsync(errorsChan chan<- error) {
 	broker := worker.server.GetBroker()
 
 	// Log some useful information about worker configuration
-	log.INFO.Printf("Launching a worker with the following settings:")
-	log.INFO.Printf("- Broker: %s", cnf.Broker)
+	log.DEBUG.Printf("Launching a worker with the following settings:")
+	log.DEBUG.Printf("- Broker: %s", cnf.Broker)
 	if worker.Queue == "" {
-		log.INFO.Printf("- DefaultQueue: %s", cnf.DefaultQueue)
+		log.DEBUG.Printf("- DefaultQueue: %s", cnf.DefaultQueue)
 	} else {
-		log.INFO.Printf("- CustomQueue: %s", worker.Queue)
+		log.DEBUG.Printf("- CustomQueue: %s", worker.Queue)
 	}
-	log.INFO.Printf("- ResultBackend: %s", cnf.ResultBackend)
+	log.DEBUG.Printf("- ResultBackend: %s", cnf.ResultBackend)
 	if cnf.AMQP != nil {
-		log.INFO.Printf("- AMQP: %s", cnf.AMQP.Exchange)
-		log.INFO.Printf("  - Exchange: %s", cnf.AMQP.Exchange)
-		log.INFO.Printf("  - ExchangeType: %s", cnf.AMQP.ExchangeType)
-		log.INFO.Printf("  - BindingKey: %s", cnf.AMQP.BindingKey)
-		log.INFO.Printf("  - PrefetchCount: %d", cnf.AMQP.PrefetchCount)
+		log.DEBUG.Printf("- AMQP: %s", cnf.AMQP.Exchange)
+		log.DEBUG.Printf("  - Exchange: %s", cnf.AMQP.Exchange)
+		log.DEBUG.Printf("  - ExchangeType: %s", cnf.AMQP.ExchangeType)
+		log.DEBUG.Printf("  - BindingKey: %s", cnf.AMQP.BindingKey)
+		log.DEBUG.Printf("  - PrefetchCount: %d", cnf.AMQP.PrefetchCount)
 	}
 
 	// Goroutine to start broker consumption and handle retries when broker connection dies
@@ -102,11 +96,11 @@ func (worker *Worker) LaunchAsync(errorsChan chan<- error) {
 						log.WARNING.Print("Waiting for running tasks to finish before shutting down")
 						go func() {
 							worker.Quit()
-							errorsChan <- ErrWorkerQuitGracefully
+							errorsChan <- errors.New("Worker quit gracefully")
 						}()
 					} else {
 						// Abort the program when user hits Ctrl+C second time in a row
-						errorsChan <- ErrWorkerQuitAbruptly
+						errorsChan <- errors.New("Worker quit abruptly")
 					}
 				}
 			}

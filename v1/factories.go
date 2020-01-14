@@ -8,22 +8,23 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/RichardKnop/machinery/v1/config"
+	"github.com/eleztian/machinery/v1/config"
 
-	amqpbroker "github.com/RichardKnop/machinery/v1/brokers/amqp"
-	eagerbroker "github.com/RichardKnop/machinery/v1/brokers/eager"
-	gcppubsubbroker "github.com/RichardKnop/machinery/v1/brokers/gcppubsub"
-	brokeriface "github.com/RichardKnop/machinery/v1/brokers/iface"
-	redisbroker "github.com/RichardKnop/machinery/v1/brokers/redis"
-	sqsbroker "github.com/RichardKnop/machinery/v1/brokers/sqs"
+	amqpbroker "github.com/eleztian/machinery/v1/brokers/amqp"
+	eagerbroker "github.com/eleztian/machinery/v1/brokers/eager"
+	gcppubsubbroker "github.com/eleztian/machinery/v1/brokers/gcppubsub"
+	brokeriface "github.com/eleztian/machinery/v1/brokers/iface"
+	redisbroker "github.com/eleztian/machinery/v1/brokers/redis"
+	sqsbroker "github.com/eleztian/machinery/v1/brokers/sqs"
 
-	amqpbackend "github.com/RichardKnop/machinery/v1/backends/amqp"
-	dynamobackend "github.com/RichardKnop/machinery/v1/backends/dynamodb"
-	eagerbackend "github.com/RichardKnop/machinery/v1/backends/eager"
-	backendiface "github.com/RichardKnop/machinery/v1/backends/iface"
-	memcachebackend "github.com/RichardKnop/machinery/v1/backends/memcache"
-	mongobackend "github.com/RichardKnop/machinery/v1/backends/mongo"
-	redisbackend "github.com/RichardKnop/machinery/v1/backends/redis"
+	amqpbackend "github.com/eleztian/machinery/v1/backends/amqp"
+	dynamobackend "github.com/eleztian/machinery/v1/backends/dynamodb"
+	eagerbackend "github.com/eleztian/machinery/v1/backends/eager"
+	backendiface "github.com/eleztian/machinery/v1/backends/iface"
+	memcachebackend "github.com/eleztian/machinery/v1/backends/memcache"
+	mongobackend "github.com/eleztian/machinery/v1/backends/mongo"
+	nullbackend "github.com/eleztian/machinery/v1/backends/null"
+	redisbackend "github.com/eleztian/machinery/v1/backends/redis"
 )
 
 // BrokerFactory creates a new object of iface.Broker
@@ -45,12 +46,16 @@ func BrokerFactory(cnf *config.Config) (brokeriface.Broker, error) {
 				cnf.Broker,
 			)
 		}
-
-		redisHost, redisPassword, redisDB, err := ParseRedisURL(cnf.Broker)
-		if err != nil {
-			return nil, err
+		brokers := strings.Split(parts[1], ",")
+		if len(brokers) > 1 {
+			return redisbroker.NewGR(cnf, brokers, 0), nil
+		} else {
+			redisHost, redisPassword, redisDB, err := ParseRedisURL(cnf.Broker)
+			if err != nil {
+				return nil, err
+			}
+			return redisbroker.New(cnf, redisHost, redisPassword, "", redisDB), nil
 		}
-		return redisbroker.New(cnf, redisHost, redisPassword, "", redisDB), nil
 	}
 
 	if strings.HasPrefix(cnf.Broker, "redis+socket://") {
@@ -115,12 +120,19 @@ func BackendFactory(cnf *config.Config) (backendiface.Backend, error) {
 	}
 
 	if strings.HasPrefix(cnf.ResultBackend, "redis://") {
-		redisHost, redisPassword, redisDB, err := ParseRedisURL(cnf.ResultBackend)
-		if err != nil {
-			return nil, err
-		}
+		parts := strings.Split(cnf.ResultBackend, "redis://")
+		addrs := strings.Split(parts[1], ",")
+		if len(addrs) > 1 {
+			return redisbackend.NewGR(cnf, addrs, 0), nil
+		} else {
+			redisHost, redisPassword, redisDB, err := ParseRedisURL(cnf.ResultBackend)
 
-		return redisbackend.New(cnf, redisHost, redisPassword, "", redisDB), nil
+			if err != nil {
+				return nil, err
+			}
+
+			return redisbackend.New(cnf, redisHost, redisPassword, "", redisDB), nil
+		}
 	}
 
 	if strings.HasPrefix(cnf.ResultBackend, "redis+socket://") {
@@ -139,6 +151,10 @@ func BackendFactory(cnf *config.Config) (backendiface.Backend, error) {
 
 	if strings.HasPrefix(cnf.ResultBackend, "eager") {
 		return eagerbackend.New(), nil
+	}
+
+	if strings.HasPrefix(cnf.ResultBackend, "null") {
+		return nullbackend.New(), nil
 	}
 
 	if strings.HasPrefix(cnf.ResultBackend, "https://dynamodb") {

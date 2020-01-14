@@ -4,17 +4,20 @@ import (
 	"crypto/tls"
 	"time"
 
-	"github.com/RichardKnop/machinery/v1/config"
+	"github.com/eleztian/machinery/v1/config"
 	"github.com/gomodule/redigo/redis"
 )
 
 var (
 	defaultConfig = &config.RedisConfig{
-		MaxIdle:                3,
-		IdleTimeout:            240,
+		MaxIdle:                10,
+		MaxActive:              100,
+		IdleTimeout:            300,
+		Wait:                   true,
 		ReadTimeout:            15,
 		WriteTimeout:           15,
 		ConnectTimeout:         15,
+		NormalTasksPollPeriod:  1000,
 		DelayedTasksPollPeriod: 20,
 	}
 )

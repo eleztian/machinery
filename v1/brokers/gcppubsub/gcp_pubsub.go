@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"cloud.google.com/go/pubsub"
-	"github.com/RichardKnop/machinery/v1/brokers/iface"
-	"github.com/RichardKnop/machinery/v1/common"
-	"github.com/RichardKnop/machinery/v1/config"
-	"github.com/RichardKnop/machinery/v1/log"
-	"github.com/RichardKnop/machinery/v1/tasks"
+	"github.com/eleztian/machinery/v1/brokers/iface"
+	"github.com/eleztian/machinery/v1/common"
+	"github.com/eleztian/machinery/v1/config"
+	"github.com/eleztian/machinery/v1/log"
+	"github.com/eleztian/machinery/v1/tasks"
 )
 
 // Broker represents an Google Cloud Pub/Sub broker
@@ -125,7 +125,8 @@ func (b *Broker) StopConsuming() {
 	<-b.stopDone
 }
 
-// Publish places a new message on the default queue
+// Publish places a new message on the default queue or the queue pointed to
+// by the routing key
 func (b *Broker) Publish(ctx context.Context, signature *tasks.Signature) error {
 	// Adjust routing key (this decides which queue the message will be published to)
 	b.AdjustRoutingKey(signature)
@@ -135,8 +136,7 @@ func (b *Broker) Publish(ctx context.Context, signature *tasks.Signature) error 
 		return fmt.Errorf("JSON marshal error: %s", err)
 	}
 
-	defaultQueue := b.GetConfig().DefaultQueue
-	topic := b.service.Topic(defaultQueue)
+	topic := b.service.Topic(signature.RoutingKey)
 	defer topic.Stop()
 
 	// Check the ETA signature field, if it is set and it is in the future,

@@ -1,7 +1,9 @@
 package redis_test
 
 import (
+	"github.com/eleztian/machinery/v1/backends/iface"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/eleztian/machinery/v1/backends/redis"
@@ -10,11 +12,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGroupCompleted(t *testing.T) {
-	redisURL := os.Getenv("REDIS_URL")
-	redisPassword := os.Getenv("REDIS_PASSWORD")
+func getRedisG() iface.Backend {
+	// host1:port1,host2:port2
+	redisURL := os.Getenv("REDIS_URL_GR")
+	//redisPassword := os.Getenv("REDIS_PASSWORD")
 	if redisURL == "" {
-		t.Skip("REDIS_URL is not defined")
+		return nil
+	}
+	backend := redis.NewGR(new(config.Config), strings.Split(redisURL, ","), 0)
+	return backend
+}
+
+func TestGroupCompletedGR(t *testing.T) {
+	backend := getRedisG()
+	if backend == nil {
+		t.Skip()
 	}
 
 	groupUUID := "testGroupUUID"
@@ -27,8 +39,6 @@ func TestGroupCompleted(t *testing.T) {
 		GroupUUID: groupUUID,
 	}
 
-	backend := redis.New(new(config.Config), redisURL, redisPassword, "", 0)
-
 	// Cleanup before the test
 	backend.PurgeState(task1.UUID)
 	backend.PurgeState(task2.UUID)
@@ -37,7 +47,7 @@ func TestGroupCompleted(t *testing.T) {
 	groupCompleted, err := backend.GroupCompleted(groupUUID, 2)
 	if assert.Error(t, err) {
 		assert.False(t, groupCompleted)
-		assert.Equal(t, "redigo: nil returned", err.Error())
+		assert.Equal(t, "redis: nil", err.Error())
 	}
 
 	backend.InitGroup(groupUUID, []string{task1.UUID, task2.UUID})
@@ -45,7 +55,7 @@ func TestGroupCompleted(t *testing.T) {
 	groupCompleted, err = backend.GroupCompleted(groupUUID, 2)
 	if assert.Error(t, err) {
 		assert.False(t, groupCompleted)
-		assert.Equal(t, "Expected byte array, instead got: <nil>", err.Error())
+		assert.Equal(t, "redis: nil", err.Error())
 	}
 
 	backend.SetStatePending(task1)
@@ -70,19 +80,16 @@ func TestGroupCompleted(t *testing.T) {
 	}
 }
 
-func TestGetState(t *testing.T) {
-	redisURL := os.Getenv("REDIS_URL")
-	redisPassword := os.Getenv("REDIS_PASSWORD")
-	if redisURL == "" {
-		return
+func TestGetStateGR(t *testing.T) {
+	backend := getRedisG()
+	if backend == nil {
+		t.Skip()
 	}
 
 	signature := &tasks.Signature{
 		UUID:      "testTaskUUID",
 		GroupUUID: "testGroupUUID",
 	}
-
-	backend := redis.New(new(config.Config), redisURL, redisPassword, "", 0)
 
 	backend.PurgeState("testTaskUUID")
 
@@ -92,7 +99,7 @@ func TestGetState(t *testing.T) {
 	)
 
 	taskState, err = backend.GetState(signature.UUID)
-	assert.Equal(t, "redigo: nil returned", err.Error())
+	assert.Equal(t, "redis: nil", err.Error())
 	assert.Nil(t, taskState)
 
 	//Pending State
@@ -131,19 +138,16 @@ func TestGetState(t *testing.T) {
 	assert.NotNil(t, taskState.Results)
 }
 
-func TestPurgeState(t *testing.T) {
-	redisURL := os.Getenv("REDIS_URL")
-	redisPassword := os.Getenv("REDIS_PASSWORD")
-	if redisURL == "" {
-		return
+func TestPurgeStateGR(t *testing.T) {
+	backend := getRedisG()
+	if backend == nil {
+		t.Skip()
 	}
 
 	signature := &tasks.Signature{
 		UUID:      "testTaskUUID",
 		GroupUUID: "testGroupUUID",
 	}
-
-	backend := redis.New(new(config.Config), redisURL, redisPassword, "", 0)
 
 	backend.SetStatePending(signature)
 	taskState, err := backend.GetState(signature.UUID)

@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RichardKnop/machinery/v1/backends/amqp"
-	"github.com/RichardKnop/machinery/v1/config"
-	"github.com/RichardKnop/machinery/v1/tasks"
+	"github.com/eleztian/machinery/v1/backends/amqp"
+	"github.com/eleztian/machinery/v1/config"
+	"github.com/eleztian/machinery/v1/tasks"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,15 +21,29 @@ func init() {
 		return
 	}
 
+	finalAmqpURL := amqpURL
+	var finalSeparator string
+
+	amqpURLs := os.Getenv("AMQP_URLS")
+	if amqpURLs != "" {
+		separator := os.Getenv("AMQP_URLS_SEPARATOR")
+		if separator == "" {
+			return
+		}
+		finalSeparator = separator
+		finalAmqpURL = amqpURLs
+	}
+
 	amqp2URL := os.Getenv("AMQP2_URL")
 	if amqp2URL == "" {
 		amqp2URL = amqpURL
 	}
 
 	amqpConfig = &config.Config{
-		Broker:        amqpURL,
-		DefaultQueue:  "test_queue",
-		ResultBackend: amqp2URL,
+		Broker:                  finalAmqpURL,
+		MultipleBrokerSeparator: finalSeparator,
+		DefaultQueue:            "test_queue",
+		ResultBackend:           amqp2URL,
 		AMQP: &config.AMQPConfig{
 			Exchange:      "test_exchange",
 			ExchangeType:  "direct",

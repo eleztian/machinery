@@ -6,18 +6,21 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"unsafe"
 
-	machinery "github.com/RichardKnop/machinery/v1"
-	"github.com/RichardKnop/machinery/v1/config"
+	machinery "github.com/eleztian/machinery/v1"
+	"github.com/eleztian/machinery/v1/config"
 	"github.com/stretchr/testify/assert"
 
-	amqpbroker "github.com/RichardKnop/machinery/v1/brokers/amqp"
-	redisbroker "github.com/RichardKnop/machinery/v1/brokers/redis"
-	sqsbroker "github.com/RichardKnop/machinery/v1/brokers/sqs"
+	amqpbroker "github.com/eleztian/machinery/v1/brokers/amqp"
+	brokeriface "github.com/eleztian/machinery/v1/brokers/iface"
+	redisbroker "github.com/eleztian/machinery/v1/brokers/redis"
+	sqsbroker "github.com/eleztian/machinery/v1/brokers/sqs"
 
-	amqpbackend "github.com/RichardKnop/machinery/v1/backends/amqp"
-	memcachebackend "github.com/RichardKnop/machinery/v1/backends/memcache"
-	redisbackend "github.com/RichardKnop/machinery/v1/backends/redis"
+	amqpbackend "github.com/eleztian/machinery/v1/backends/amqp"
+	memcachebackend "github.com/eleztian/machinery/v1/backends/memcache"
+	mongobackend "github.com/eleztian/machinery/v1/backends/mongo"
+	redisbackend "github.com/eleztian/machinery/v1/backends/redis"
 )
 
 var (
@@ -111,7 +114,7 @@ func TestBrokerFactory(t *testing.T) {
 		expected := amqpbroker.New(&cnf)
 		assert.True(
 			t,
-			reflect.DeepEqual(actual, expected),
+			brokerEqual(actual, expected),
 			fmt.Sprintf("conn = %v, want %v", actual, expected),
 		)
 	}
@@ -135,7 +138,7 @@ func TestBrokerFactory(t *testing.T) {
 		expected := redisbroker.New(&cnf, "localhost:6379", "password", "", 0)
 		assert.True(
 			t,
-			reflect.DeepEqual(actual, expected),
+			brokerEqual(actual, expected),
 			fmt.Sprintf("conn = %v, want %v", actual, expected),
 		)
 	}
@@ -157,7 +160,7 @@ func TestBrokerFactory(t *testing.T) {
 		expected := redisbroker.New(&cnf, "localhost:6379", "", "", 0)
 		assert.True(
 			t,
-			reflect.DeepEqual(actual, expected),
+			brokerEqual(actual, expected),
 			fmt.Sprintf("conn = %v, want %v", actual, expected),
 		)
 	}
@@ -179,7 +182,7 @@ func TestBrokerFactory(t *testing.T) {
 		expected := redisbroker.New(&cnf, "", "", "/tmp/redis.sock", 0)
 		assert.True(
 			t,
-			reflect.DeepEqual(actual, expected),
+			brokerEqual(actual, expected),
 			fmt.Sprintf("conn = %v, want %v", actual, expected),
 		)
 	}
@@ -219,6 +222,28 @@ func TestBrokerFactory(t *testing.T) {
 	}
 	os.Unsetenv("DISABLE_STRICT_SQS_CHECK")
 
+}
+
+func brokerEqual(x, y brokeriface.Broker) bool {
+	// unset Broker.stopChan and Broker.retryStopChan to nil before using
+	// reflect.DeepEqual() as the objects will have a different address
+	rx := reflect.ValueOf(x).Elem()
+	rxf := rx.FieldByName("stopChan")
+	rxf = reflect.NewAt(rxf.Type(), unsafe.Pointer(rxf.UnsafeAddr())).Elem()
+	rxf.Set(reflect.Zero(rxf.Type()))
+	rxf = rx.FieldByName("retryStopChan")
+	rxf = reflect.NewAt(rxf.Type(), unsafe.Pointer(rxf.UnsafeAddr())).Elem()
+	rxf.Set(reflect.Zero(rxf.Type()))
+
+	ry := reflect.ValueOf(y).Elem()
+	ryf := ry.FieldByName("stopChan")
+	ryf = reflect.NewAt(ryf.Type(), unsafe.Pointer(ryf.UnsafeAddr())).Elem()
+	ryf.Set(reflect.Zero(ryf.Type()))
+	ryf = ry.FieldByName("retryStopChan")
+	ryf = reflect.NewAt(ryf.Type(), unsafe.Pointer(ryf.UnsafeAddr())).Elem()
+	ryf.Set(reflect.Zero(ryf.Type()))
+
+	return reflect.DeepEqual(x, y)
 }
 
 func TestBrokerFactoryError(t *testing.T) {
@@ -350,16 +375,16 @@ func TestBackendFactory(t *testing.T) {
 		ResultsExpireIn: 30,
 	}
 
-	_, err = machinery.BackendFactory(&cnf)
+	actual, err = machinery.BackendFactory(&cnf)
 	if assert.NoError(t, err) {
-		//expected, err := mongobackend.New(&cnf)
-		//if assert.NoError(t, err) {
-		// assert.True(
-		// 	t,
-		// 	reflect.DeepEqual(actual, expected),
-		// 	fmt.Sprintf("conn = %v, want %v", actual, expected),
-		// )
-		//}
+		expected, err := mongobackend.New(&cnf)
+		if assert.NoError(t, err) {
+			assert.True(
+				t,
+				reflect.DeepEqual(actual, expected),
+				fmt.Sprintf("conn = %v, want %v", actual, expected),
+			)
+		}
 	}
 }
 

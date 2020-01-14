@@ -19,6 +19,7 @@ Machinery is an asynchronous task queue/job queue based on distributed message p
 
 ---
 
+* [V2 Experiment](#v2-experiment)
 * [First Steps](#first-steps)
 * [Configuration](#configuration)
 * [Custom Logger](#custom-logger)
@@ -41,6 +42,29 @@ Machinery is an asynchronous task queue/job queue based on distributed message p
   * [Requirements](#requirements)
   * [Dependencies](#dependencies)
   * [Testing](#testing)
+
+### V2 Experiment
+
+Please be advised that V2 is work in progress and breaking changes can and will happen until it is ready.
+
+You can use the current V2 in order to avoid having to import all dependencies for brokers and backends you are not using.
+
+Instead of factory, you will need to inject broker and backend objects to the server constructor:
+
+```go
+import (
+  "github.com/eleztian/machinery/v2"
+  backendsiface "github.com/eleztian/machinery/v1/backends/iface"
+  brokersiface "github.com/eleztian/machinery/v1/brokers/iface"
+)
+
+var broker brokersiface.Broker
+var backend backendsiface.Backend
+server, err := machinery.NewServer(cnf, broker, backend)
+if err != nil {
+  // do something with the error
+}
+```
 
 ### First Steps
 
@@ -103,6 +127,8 @@ amqp://[username:password@]@host[:port]
 For example:
 
 1. `amqp://guest:guest@localhost:5672`
+
+AMQP also supports multiples brokers urls. You need to specify the URL separator in the `MultipleBrokerSeparator` field.
 
 ##### Redis
 
@@ -204,6 +230,8 @@ For example:
 
 1. `redis://localhost:6379`, or with password `redis://password@localhost:6379`
 2. `redis+socket://password@/path/to/file.sock:/0`
+3. cluster `redis://host1:port1,host2:port2,host3:port3`
+4. cluster with password `redis://pass@host1:port1,host2:port2,host3:port3`
 
 ##### Memcache
 
@@ -306,8 +334,8 @@ A Machinery library must be instantiated before use. The way this is done is by 
 
 ```go
 import (
-  "github.com/RichardKnop/machinery/v1/config"
-  "github.com/RichardKnop/machinery/v1"
+  "github.com/eleztian/machinery/v1/config"
+  "github.com/eleztian/machinery/v1"
 )
 
 var cnf = &config.Config{
@@ -477,7 +505,7 @@ type Signature struct {
 
 `ETA` is  a timestamp used for delaying a task. if it's nil, the task will be published for workers to consume immediately. If it is set, the task will be delayed until the ETA timestamp.
 
-`GroupUUID`, GroupTaskCount are useful for creating groups of tasks.
+`GroupUUID`, `GroupTaskCount` are useful for creating groups of tasks.
 
 `Args` is a list of arguments that will be passed to the task when it is executed by a worker.
 
@@ -534,7 +562,7 @@ Tasks can be called by passing an instance of `Signature` to an `Server` instanc
 
 ```go
 import (
-  "github.com/RichardKnop/machinery/v1/tasks"
+  "github.com/eleztian/machinery/v1/tasks"
 )
 
 signature := &tasks.Signature{
@@ -570,7 +598,7 @@ signature.ETA = &eta
 
 #### Retry Tasks
 
-You can set a number of retry attempts before declaring task as failed. Fibonacci sequence will be used to space out retry requests over time.
+You can set a number of retry attempts before declaring task as failed. Fibonacci sequence will be used to space out retry requests over time. (See `RetryTimeout` for details.)
 
 ```go
 // If the task fails, retry it up to 3 times
@@ -699,8 +727,8 @@ Running a single asynchronous task is fine but often you will want to design a w
 
 ```go
 import (
-  "github.com/RichardKnop/machinery/v1/tasks"
-  "github.com/RichardKnop/machinery/v1"
+  "github.com/eleztian/machinery/v1/tasks"
+  "github.com/eleztian/machinery/v1"
 )
 
 signature1 := tasks.Signature{
@@ -760,8 +788,8 @@ for _, asyncResult := range asyncResults {
 
 ```go
 import (
-  "github.com/RichardKnop/machinery/v1/tasks"
-  "github.com/RichardKnop/machinery/v1"
+  "github.com/eleztian/machinery/v1/tasks"
+  "github.com/eleztian/machinery/v1"
 )
 
 signature1 := tasks.Signature{
@@ -836,8 +864,8 @@ for _, result := range results {
 
 ```go
 import (
-  "github.com/RichardKnop/machinery/v1/tasks"
-  "github.com/RichardKnop/machinery/v1"
+  "github.com/eleztian/machinery/v1/tasks"
+  "github.com/eleztian/machinery/v1"
 )
 
 signature1 := tasks.Signature{

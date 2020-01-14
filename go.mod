@@ -1,31 +1,25 @@
-module github.com/RichardKnop/machinery
+module github.com/eleztian/machinery
 
 require (
-	cloud.google.com/go v0.36.0
-	github.com/RichardKnop/logging v0.0.0-20181101035820-b1d5d44c82d6
+	cloud.google.com/go/pubsub v1.0.1
+	github.com/RichardKnop/logging v0.0.0-20190827224416-1a693bdd4fae
+	github.com/RichardKnop/machinery v1.7.3
 	github.com/RichardKnop/redsync v1.2.0
-	github.com/aws/aws-sdk-go v1.17.2
-	github.com/bradfitz/gomemcache v0.0.0-20180710155616-bc664df96737
-	github.com/go-stack/stack v1.8.0 // indirect
-	github.com/golang/snappy v0.0.1 // indirect
+	github.com/aws/aws-sdk-go v1.25.8
+	github.com/bradfitz/gomemcache v0.0.0-20190913173617-a41fca850d0b
+	github.com/go-redis/redis v6.15.6+incompatible
 	github.com/gomodule/redigo v2.0.0+incompatible
-	github.com/google/uuid v1.1.0
-	github.com/kelseyhightower/envconfig v1.3.0
-	github.com/opentracing/opentracing-go v1.0.2
-	github.com/streadway/amqp v0.0.0-20190214183023-884228600bc9
+	github.com/google/uuid v1.1.1
+	github.com/kelseyhightower/envconfig v1.4.0
+	github.com/opentracing/opentracing-go v1.1.0
+	github.com/pkg/errors v0.8.1
+	github.com/streadway/amqp v0.0.0-20190827072141-edfb9018d271
 	github.com/stretchr/testify v1.3.0
-	github.com/stvp/tempredis v0.0.0-20181119212430-b82af8480203 // indirect
-	github.com/tidwall/pretty v0.0.0-20180105212114-65a9db5fad51 // indirect
-	github.com/urfave/cli v1.20.0
-	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
-	github.com/xdg/stringprep v1.0.0 // indirect
-	go.mongodb.org/mongo-driver v1.0.0
-	go.opencensus.io v0.19.0 // indirect
-	golang.org/x/crypto v0.0.0-20190219172222-a4c6cb3142f2 // indirect
-	golang.org/x/net v0.0.0-20190213061140-3a22650c66bd // indirect
-	golang.org/x/oauth2 v0.0.0-20190220154721-9b3c75971fc9 // indirect
-	golang.org/x/sys v0.0.0-20190221075227-b4e8571b14e0 // indirect
-	google.golang.org/genproto v0.0.0-20190219182410-082222b4a5c5 // indirect
-	google.golang.org/grpc v1.18.0 // indirect
-	gopkg.in/yaml.v2 v2.2.2
+	github.com/urfave/cli v1.22.1
+	go.mongodb.org/mongo-driver v1.1.2
+	gopkg.in/yaml.v2 v2.2.4
 )
+
+replace git.apache.org/thrift.git => github.com/apache/thrift v0.0.0-20180902110319-2566ecd5d999
+
+go 1.13

@@ -3,8 +3,8 @@ package iface
 import (
 	"context"
 
-	"github.com/RichardKnop/machinery/v1/config"
-	"github.com/RichardKnop/machinery/v1/tasks"
+	"github.com/eleztian/machinery/v1/config"
+	"github.com/eleztian/machinery/v1/tasks"
 )
 
 // Broker - a common interface for all brokers
@@ -16,6 +16,7 @@ type Broker interface {
 	StopConsuming()
 	Publish(ctx context.Context, task *tasks.Signature) error
 	GetPendingTasks(queue string) ([]*tasks.Signature, error)
+	GetDelayedTasks() ([]*tasks.Signature, error)
 	AdjustRoutingKey(s *tasks.Signature)
 }
 

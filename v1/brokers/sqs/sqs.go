@@ -9,14 +9,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/RichardKnop/machinery/v1/brokers/iface"
-	"github.com/RichardKnop/machinery/v1/common"
-	"github.com/RichardKnop/machinery/v1/config"
-	"github.com/RichardKnop/machinery/v1/log"
-	"github.com/RichardKnop/machinery/v1/tasks"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs/sqsiface"
+	"github.com/eleztian/machinery/v1/brokers/errs"
+	"github.com/eleztian/machinery/v1/brokers/iface"
+	"github.com/eleztian/machinery/v1/common"
+	"github.com/eleztian/machinery/v1/config"
+	"github.com/eleztian/machinery/v1/log"
+	"github.com/eleztian/machinery/v1/tasks"
 
 	awssqs "github.com/aws/aws-sdk-go/service/sqs"
 )
@@ -56,11 +57,6 @@ func New(cnf *config.Config) iface.Broker {
 	return b
 }
 
-// GetPendingTasks returns a slice of task.Signatures waiting in the queue
-func (b *Broker) GetPendingTasks(queue string) ([]*tasks.Signature, error) {
-	return nil, errors.New("Not implemented")
-}
-
 // StartConsuming enters a loop and waits for incoming messages
 func (b *Broker) StartConsuming(consumerTag string, concurrency int, taskProcessor iface.TaskProcessor) (bool, error) {
 	b.Broker.StartConsuming(consumerTag, concurrency, taskProcessor)
@@ -68,8 +64,13 @@ func (b *Broker) StartConsuming(consumerTag string, concurrency int, taskProcess
 	//save it so that it can be used later when attempting to delete task
 	b.queueUrl = qURL
 
-	deliveries := make(chan *awssqs.ReceiveMessageOutput)
+	deliveries := make(chan *awssqs.ReceiveMessageOutput, concurrency)
+	pool := make(chan struct{}, concurrency)
 
+	// initialize worker pool with maxWorkers workers
+	for i := 0; i < concurrency; i++ {
+		pool <- struct{}{}
+	}
 	b.stopReceivingChan = make(chan int)
 	b.receivingWG.Add(1)
 
@@ -82,31 +83,27 @@ func (b *Broker) StartConsuming(consumerTag string, concurrency int, taskProcess
 			select {
 			// A way to stop this goroutine from b.StopConsuming
 			case <-b.stopReceivingChan:
+				close(deliveries)
 				return
-			default:
+			case <-pool:
 				output, err := b.receiveMessage(qURL)
-				if err != nil {
-					log.ERROR.Printf("Queue consume error: %s", err)
-					continue
-				}
-				if len(output.Messages) == 0 {
-					continue
-				}
+				if err == nil && len(output.Messages) > 0 {
+					deliveries <- output
 
-				deliveries <- output
+				} else {
+					//return back to pool right away
+					pool <- struct{}{}
+					if err != nil {
+						log.ERROR.Printf("Queue consume error: %s", err)
+					}
+
+				}
 			}
 
-			whetherContinue, err := b.continueReceivingMessages(qURL, deliveries)
-			if err != nil {
-				log.ERROR.Printf("Error when receiving messages. Error: %v", err)
-			}
-			if whetherContinue == false {
-				return
-			}
 		}
 	}()
 
-	if err := b.consume(deliveries, concurrency, taskProcessor); err != nil {
+	if err := b.consume(deliveries, concurrency, taskProcessor, pool); err != nil {
 		return b.GetRetry(), err
 	}
 
@@ -181,13 +178,7 @@ func (b *Broker) Publish(ctx context.Context, signature *tasks.Signature) error 
 }
 
 // consume is a method which keeps consuming deliveries from a channel, until there is an error or a stop signal
-func (b *Broker) consume(deliveries <-chan *awssqs.ReceiveMessageOutput, concurrency int, taskProcessor iface.TaskProcessor) error {
-	pool := make(chan struct{}, concurrency)
-
-	// initialize worker pool with maxWorkers workers
-	go func() {
-		b.initializePool(pool, concurrency)
-	}()
+func (b *Broker) consume(deliveries <-chan *awssqs.ReceiveMessageOutput, concurrency int, taskProcessor iface.TaskProcessor, pool chan struct{}) error {
 
 	errorsChan := make(chan error)
 
@@ -214,17 +205,31 @@ func (b *Broker) consumeOne(delivery *awssqs.ReceiveMessageOutput, taskProcessor
 	decoder.UseNumber()
 	if err := decoder.Decode(sig); err != nil {
 		log.ERROR.Printf("unmarshal error. the delivery is %v", delivery)
+		// if the unmarshal fails, remove the delivery from the queue
+		if delErr := b.deleteOne(delivery); delErr != nil {
+			log.ERROR.Printf("error when deleting the delivery. delivery is %v, Error=%s", delivery, delErr)
+		}
 		return err
+	}
+	if delivery.Messages[0].ReceiptHandle != nil {
+		sig.SQSReceiptHandle = *delivery.Messages[0].ReceiptHandle
 	}
 
 	// If the task is not registered return an error
 	// and leave the message in the queue
 	if !b.IsTaskRegistered(sig.Name) {
+		if sig.IgnoreWhenTaskNotRegistered {
+			b.deleteOne(delivery)
+		}
 		return fmt.Errorf("task %s is not registered", sig.Name)
 	}
 
 	err := taskProcessor.Process(sig)
 	if err != nil {
+		// stop task deletion in case we want to send messages to dlq in sqs
+		if err == errs.ErrStopTaskDeletion {
+			return nil
+		}
 		return err
 	}
 	// Delete message after successfully consuming and processing the message
@@ -302,10 +307,6 @@ func (b *Broker) consumeDeliveries(deliveries <-chan *awssqs.ReceiveMessageOutpu
 	case err := <-errorsChan:
 		return false, err
 	case d := <-deliveries:
-		if concurrency > 0 {
-			// get worker from pool (blocks until one is available)
-			<-pool
-		}
 
 		b.processingWG.Add(1)
 
