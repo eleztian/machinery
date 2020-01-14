@@ -303,7 +303,7 @@ func (b *BrokerGR) consumeOne(delivery []byte, taskProcessor iface.TaskProcessor
 		return nil
 	}
 
-	log.DEBUG.Printf("Received new message: %s", delivery)
+	log.INFO.Printf("Received new message: %s", delivery)
 
 	return taskProcessor.Process(signature)
 }
